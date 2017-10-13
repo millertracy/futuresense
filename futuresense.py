@@ -15,22 +15,37 @@ import datetime as dt
 import json
 import re
 import pandas as pd
+import pymongo
 
 
 class FutureSense():
-    def __init__(self, sandbox=False):
+    def __init__(self, user, sandbox=False):
         self.access_token = ''
         self.refresh_token = ''
         self.client_id = os.environ['DEX_CLIENT_ID']
         self.client_secret = os.environ['DEX_CLIENT_SECRET']
-        self.authcode = ''
+        self.redirect_uri = '34.215.61.65'
+
         self.sandbox = sandbox
         self.headers = {}
 
+        # set the connection URL based on whether we are using the
+        # sandbox environment or production data
         if self.sandbox:
             self.conn = http.HTTPSConnection("sandbox-api.dexcom.com")
         else:
             self.conn = http.HTTPSConnection("api.dexcom.com")
+
+        self.mc = pymongo.MongoClient()  # Connect to the MongoDB server using default settings
+        self.db = self.mc['future_sense']  # Use (or create) a database called 'future_sense'
+        self.docs = self.db['docs'] # Use (or create) a collection called 'docs'
+
+        # open the list of users (in username:authcode format) to get the
+        # authorization code for the current user
+        with open('users.csv', 'r') as f:
+            self.users = ast.literal_eval(f.read())
+        self.currentuser = user
+        self.authcode = self.users[self.currentuser]
 
 
     def get_auth(self):
@@ -39,7 +54,7 @@ class FutureSense():
         for user data
         '''
 
-        payload = "client_secret=" + self.client_secret + "&client_id=" + self.client_id + "&code=" + self.authcode + "&grant_type=authorization_code&redirect_uri=34.215.61.65"
+        payload = "client_secret=" + self.client_secret + "&client_id=" + self.client_id + "&code=" + self.authcode + "&grant_type=authorization_code&redirect_uri=" + self.redirect_uri
 
         headers = {
             'content-type': "application/x-www-form-urlencoded",
@@ -53,6 +68,7 @@ class FutureSense():
 
         result = ast.literal_eval(data)
         self.access_token = result['access_token']
+        self.refresh_token = result['refresh_token']
         self.headers = {'authorization': "Bearer " + self.access_token}
 
 
@@ -60,17 +76,136 @@ class FutureSense():
         '''
         Continuously refresh the authorization connection every 9 minutes,
         until explicitly ordered to stop.
+
+        Is this needed? Need to figure out threading this in the background.
         '''
-        pass
+        payload = "client_secret=" + self.client_secret + "&client_id=" + self.client_id + "&refresh_token=" + self.refresh_token + "&grant_type=refresh_token&redirect_uri=" + self.redirect_uri
+
+        headers = {
+            'content-type': "application/x-www-form-urlencoded",
+            'cache-control': "no-cache"
+            }
+
+        self.conn.request("POST", "/v1/oauth2/token", payload, headers)
+
+        res = conn.getresponse()
+        data = res.read()
+
+        result = ast.literal_eval(data)
+        self.access_token = result['access_token']
+        self.refresh_token = result['refresh_token']
+        self.headers = {'authorization': "Bearer " + self.access_token}
 
 
-    def egvdecode(self, data):
+    def get_egvs(self, startday='01/01/2015', incr=90, reps=1):
         '''
-        Unpack the data payload into units (str), rate of change (str), and
-        EGVs list(dicts).
-        ------------------------
-        Watch for empty results like:
-        {"unit":"mg/dL","rateUnit":"mg/dL/min","egvs":[]}
+        Get the Estimated Glucose Values (EGVs) for the specified date range,
+        and stores the results in the DB
+        '''
+
+        start = pd.Timestamp(startday)
+        plusX = dt.timedelta(days=incr)
+
+        self.get_auth()
+        time.sleep(2)
+
+        for i in range(reps):
+            self.conn.request("GET", "/v1/users/self/egvs" + "?startDate=" +
+                              str(start + (plusX * i)).replace(' ', 'T') +
+                              "&endDate=" + str(start +
+                              (plusX * (i+1))).replace(' ', 'T'), headers=self.headers)
+            res = self.conn.getresponse()
+            data = res.read()
+
+            units, rate, egvs = self.egv_decode(data)
+            if egvs != None:
+                for egv in ast.literal_eval(egvs):
+                    egv.update({'recordType': 'egv', 'units': units, 'rate': rate, 'user': self.currentuser})
+                    if not self.docs.find_one(egv):
+                        self.docs.insert(egv)
+
+                    # self.docs.insert_one(egv)
+                    print egv
+
+
+    def get_calibrations(self, startday='01/01/2015', incr=90, reps=1):
+        '''
+        Get the calibration readings for the specified date range, and
+        stores the results in the DB.
+
+        Calibration readings are where the user physically tests their blood
+        glucose level using a glucometer, and inputs the reading into the CGM
+        software.
+        '''
+
+        start = pd.Timestamp(startday)
+        plusX = dt.timedelta(days=incr)
+
+        self.get_auth()
+        time.sleep(2)
+
+        for i in range(reps):
+            self.conn.request("GET", "/v1/users/self/calibrations" + "?startDate=" +
+                              str(start + (plusX * i)).replace(' ', 'T') +
+                              "&endDate=" + str(start +
+                              (plusX * (i+1))).replace(' ', 'T'), headers=self.headers)
+            res = self.conn.getresponse()
+            data = res.read()
+
+            calibs = self.calib_decode(data)
+            if calibs != None:
+                for calib in ast.literal_eval(calibs):
+                    calib.update({'recordType': 'calibration', 'user': self.currentuser})
+                    if not self.docs.find_one(calib):
+                        self.docs.insert(calib)
+
+                    # self.docs.insert_one(egv)
+                    print calib
+
+
+    def get_events(self, startday='01/01/2015', incr=90, reps=1):
+        '''
+        Get event data for the specified date range, and stores the results
+        in the DB.
+
+        Event data includes records of when the user exercised, consumed food
+        (recorded as grams of carbohydrates), consumed alcohol, or experienced
+        stress - all of which can have an impact on glucose levels.
+        '''
+
+        start = pd.Timestamp(startday)
+        plusX = dt.timedelta(days=incr)
+
+        self.get_auth()
+        time.sleep(2)
+
+        for i in range(reps):
+            self.conn.request("GET", "/v1/users/self/events" + "?startDate=" +
+                              str(start + (plusX * i)).replace(' ', 'T') +
+                              "&endDate=" + str(start +
+                              (plusX * (i+1))).replace(' ', 'T'), headers=self.headers)
+            res = self.conn.getresponse()
+            data = res.read()
+
+            events = self.event_decode(data)
+            if events != None:
+                for event in ast.literal_eval(events):
+                    event.update({'recordType': 'event', 'user': self.currentuser})
+                    if not self.docs.find_one(event):
+                        self.docs.insert(event)
+
+                    # self.docs.insert_one(egv)
+                    print event
+
+    def get_all(self, all_startday='01/01/2015', all_incr=90, all_reps=1):
+        self.get_egvs(startday=all_startday, incr=all_incr, reps=all_reps)
+        self.get_calibrations(startday=all_startday, incr=all_incr, reps=all_reps)
+        self.get_events(startday=all_startday, incr=all_incr, reps=all_reps)
+
+    def egv_decode(self, data):
+        '''
+        Unpack the data payload for EGVs and convert the list of records
+        into individual records.
         '''
         # expected units = 'mg/dL'
         units_re = re.compile('(?<=\"unit\":\").+(?=\",\"rateUnit)')
@@ -90,7 +225,27 @@ class FutureSense():
         return units, rate, egvs
 
 
-    def eventdecode(self, data):
+    def calib_decode(self, data):
+        '''
+        Unpack the data payload for calibrations and convert the list of records
+        into individual records.
+        '''
+
+        calib_re = re.compile('(?<=:\[).+(?=\]})')
+        try:
+            calibs = calib_re.search(data).group().replace('null', '"null"')
+        except:
+            calibs = None
+
+        return calibs
+
+
+    def event_decode(self, data):
+        '''
+        Unpack the data payload for events and convert the list of records
+        into individual records.
+        '''
+
         events_re = re.compile('(?<=:\[).+(?=\]})')
         try:
             events = events_re.search(data).group().replace('null', '"null"')
@@ -99,68 +254,6 @@ class FutureSense():
 
         return events
 
+fs = FutureSense(user='sandbox1', sandbox=True)
 
-    def get_egvs(self, auth, startday='01/01/2015', incr=90, reps=1):
-        self.authcode = auth
-
-        start = pd.Timestamp(startday)
-        plusX = dt.timedelta(days=incr)
-
-        self.get_auth()
-        time.sleep(2)
-
-        for i in range(reps):
-            self.conn.request("GET", "/v1/users/self/egvs" + "?startDate=" +
-                              str(start + (plusX * i)).replace(' ', 'T') +
-                              "&endDate=" + str(start +
-                              (plusX * (i+1))).replace(' ', 'T'), headers=self.headers)
-            res = self.conn.getresponse()
-            data = res.read()
-
-            units, rate, egvs = self.egvdecode(data)
-            if egvs != None:
-                result = []
-                for egv in ast.literal_eval(egvs):
-                    egv.update({'recordType': 'egv', 'units': units, 'rate': rate})
-                    result.append(egv)
-
-                    # this will append a list of objects, not objects to the existing file
-                    # need to correct so each entry is appended to the db individually
-                    # also the file io is still fucked up
-                with open('testdata.json', mode='r') as datafeed:
-                    feeds = json.load(datafeed)
-                    # print feeds
-                with open('testdata.json', mode='w') as outfile:
-                    json.load
-                    print feeds
-                    json.dump(feeds, outfile)
-
-    def get_events(self, auth, startday='01/01/2015', incr=90, reps=1):
-        self.authcode = auth
-
-        start = pd.Timestamp(startday)
-        plusX = dt.timedelta(days=incr)
-
-        self.get_auth()
-        time.sleep(2)
-
-        for i in range(reps):
-            self.conn.request("GET", "/v1/users/self/events" + "?startDate=" +
-                              str(start + (plusX * i)).replace(' ', 'T') +
-                              "&endDate=" + str(start +
-                              (plusX * (i+1))).replace(' ', 'T'), headers=self.headers)
-            res = self.conn.getresponse()
-            data = res.read()
-
-            events = self.eventdecode(data)
-            if events != None:
-                for event in ast.literal_eval(events):
-                    event.update({'recordType': 'event'})
-                    print event
-
-
-fs = FutureSense(sandbox=True)
-
-fs.get_egvs(auth='authcode1', startday='9/1/2016', incr=.01)
-fs.get_events(auth='authcode1', startday='9/1/2016', incr=1)
-#fs.get_readings()
+fs.get_all(all_startday='9/1/2016', all_incr=1)
