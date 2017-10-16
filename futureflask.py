@@ -30,7 +30,7 @@ def login():
 
 @app.route('/osenviron')
 def ose():
-    return os.environ['DEX_CLIENT_ID']
+    return os.environ['DEX_CLIENT_SECRET']
 
 @app.route('/oauth-authorized')
 # @dexcom.authorized_response()
