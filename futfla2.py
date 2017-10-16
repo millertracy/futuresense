@@ -68,4 +68,5 @@ def obtain_dexcom_token():
 
 
 if __name__ == '__main__':
+    app.secret_key = client_secret
     app.run()
