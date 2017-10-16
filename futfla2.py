@@ -44,8 +44,8 @@ app = Flask(__name__)
 # application here: https://dexcom.com/settings/applications/new
 client_id = os.environ['DEX_CLIENT_ID']
 client_secret = os.environ['DEX_CLIENT_SECRET']
-authorization_base_url = 'https://sandbox-api.dexcom.com/v1/oauth2/login'
-token_url = 'https://sandbox-api.dexcom.com/v1/oauth2/login'
+authorization_base_url = 'https://api.dexcom.com/v1/oauth2/login'
+token_url = 'https://api.dexcom.com/v1/oauth2/login'
 redirect_u = '34.215.61.65'
 scp = ['offline_access']
 
@@ -92,7 +92,7 @@ def profile():
     """Fetching a protected resource using an OAuth 2 token.
     """
     dexcom = OAuth2Session(client_id, token=session['oauth_token'], redirect_uri=redirect_u)
-    return jsonify(dexcom.get('https://sandbox-api.dexcom.com/v1/oauth2/login').json())
+    return jsonify(dexcom.get('https://api.dexcom.com/v1/oauth2/login').json())
 
 
 if __name__ == "__main__":
