@@ -47,6 +47,7 @@ client_secret = os.environ['DEX_CLIENT_SECRET']
 authorization_base_url = 'https://sandbox-api.dexcom.com/v1/oauth2/login'
 token_url = 'https://sandbox-api.dexcom.com/v1/oauth2/login'
 redirect_u = '34.215.61.65'
+scp = 'offline_access'
 
 @app.route("/")
 def demo():
@@ -55,7 +56,7 @@ def demo():
     Redirect the user/resource owner to the OAuth provider (i.e. Dexcom)
     using an URL with a few key OAuth parameters.
     """
-    dexcom = OAuth2Session(client_id, redirect_uri=redirect_u, scope='offline_access')
+    dexcom = OAuth2Session(client_id, redirect_uri=redirect_u, scope=scp)
     authorization_url, state = dexcom.authorization_url(authorization_base_url)
 
     # State is used to prevent CSRF, keep this for later.
