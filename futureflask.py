@@ -45,7 +45,7 @@ def get_dexcom_token():
 
 @app.route('/login')
 def login():
-    return dexcom.authorize(callback=url_for('oauth_authorized', _external=True))
+    return dexcom.authorize(callback=url_for('oauth_authorized'))
 
 @app.route('/osenviron')
 def ose():
