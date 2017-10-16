@@ -3,7 +3,7 @@ from flask_oauthlib.client import OAuth
 import os
 
 app = Flask(__name__)
-app.debug = True
+
 oauth = OAuth()
 
 client_id = os.environ['DEX_CLIENT_ID']
@@ -37,7 +37,7 @@ app.config['DEXCOM'] = dict(
         'scope': 'offline_access'
         }
 )
-oauth.init_app(app)
+
 
 @dexcom.tokengetter
 def get_dexcom_token():
@@ -85,4 +85,7 @@ def index():
 
 
 if __name__ == '__main__':
+    app.secret_key = client_secret
+    oauth.init_app(app)
+    app.debug = True
     app.run(host='0.0.0.0', threaded=True)
