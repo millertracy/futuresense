@@ -20,8 +20,7 @@ redirect = '34.215.61.65'
 dexcom = oauth.remote_app('dexcom',
     app_key='DEXCOM',
     consumer_key=client_id,
-    consumer_secret=client_secret,
-    redirect_uri=redirect
+    consumer_secret=client_secret
 )
 
 app.config['DEXCOM'] = dict(
@@ -29,6 +28,7 @@ app.config['DEXCOM'] = dict(
     consumer_secret=client_secret,
     base_url='https://sandbox-api.dexcom.com',
     request_token_url=None,
+    access_token_method='POST',
     access_token_url='https://sandbox-api.dexcom.com/v1/oauth2/token',
     authorize_url='https://sandbox-api.dexcom.com/v1/oauth2/login',
     request_token_params={
@@ -46,14 +46,15 @@ def get_dexcom_token():
 
 @app.route('/login')
 def login():
-    return dexcom.authorize(callback=url_for('oauth_authorized'))
+    return dexcom.authorize(callback=url_for('oauth_authorized',
+                            _external=True))
 
 @app.route('/osenviron')
 def ose():
     return os.environ['DEX_CLIENT_SECRET']
 
 @app.route('/oauth-authorized')
-# @dexcom.authorized_response()
+# @dexcom.authorized_handler
 def oauth_authorized():
     resp = dexcom.authorized_response()
     if resp is None:
