@@ -55,7 +55,7 @@ def demo():
     Redirect the user/resource owner to the OAuth provider (i.e. Dexcom)
     using an URL with a few key OAuth parameters.
     """
-    dexcom = OAuth2Session(client_id, redirect_uri=redirect_u)
+    dexcom = OAuth2Session(client_id, redirect_uri=redirect_u, scope='offline_access')
     authorization_url, state = dexcom.authorization_url(authorization_base_url)
 
     # State is used to prevent CSRF, keep this for later.
