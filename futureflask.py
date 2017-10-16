@@ -3,30 +3,49 @@ from flask_oauthlib.client import OAuth
 import os
 
 app = Flask(__name__)
+app.debug = True
 oauth = OAuth()
 
 client_id = os.environ['DEX_CLIENT_ID']
 client_secret = os.environ['DEX_CLIENT_SECRET']
 redirect_uri = '34.215.61.65'
 
+# payload = "client_secret=" + self.client_secret + "&client_id=" + self.client_id + "&code=" + self.authcode + "&grant_type=authorization_code&redirect_uri=" + self.redirect_uri
+#
+# headers = {
+#     'content-type': "application/x-www-form-urlencoded",
+#     'cache-control': "no-cache"
+#     }
+
 dexcom = oauth.remote_app('dexcom',
-    base_url='https://sandbox-api.dexcom.com',
-    request_token_url=None,
-    access_token_url='https://sandbox-api.dexcom.com/v1/oauth2/token',
-    authorize_url='https://sandbox-api.dexcom.com/v1/oauth2/login',
+    app_key='DEXCOM',
     consumer_key=client_id,
     consumer_secret=client_secret
 )
 
+app.config['DEXCOM'] = dict(
+    consumer_key=client_id,
+    consumer_secret=client_secret,
+    base_url='https://sandbox-api.dexcom.com',
+    request_token_url=None,
+    access_token_url='https://sandbox-api.dexcom.com/v1/oauth2/token',
+    authorize_url='https://sandbox-api.dexcom.com/v1/oauth2/login,
+    request_token_params={
+        'client_id': client_id,
+        'redirect_uri': redirect_uri,
+        'response_type': 'code',
+        'scope': 'offline_access'
+        }
+)
+oauth.init_app(app)
+
 @dexcom.tokengetter
-def get_dexcom_token(token=None):
+def get_dexcom_token():
     return session.get('dexcom_token')
 
 @app.route('/login')
 def login():
-    return dexcom.authorize(callback=url_for('oauth_authorized',
-                next=request.args.get('next') or request.referrer
-                or None, _external=True))
+    return dexcom.authorize(callback=url_for('oauth_authorized', _external=True))
 
 @app.route('/osenviron')
 def ose():
@@ -35,20 +54,30 @@ def ose():
 @app.route('/oauth-authorized')
 # @dexcom.authorized_response()
 def oauth_authorized():
-    next_url = request.args.get('next') or url_for('index')
     resp = dexcom.authorized_response()
     if resp is None:
-        flash(u'You denied the request to sign in.')
-        return redirect(next_url)
+        return 'Access denied: reason=%s error=%s' % (
+            request.args['error'],
+            request.args['error_description']
+        )
+    session['dexcom_token'] = (resp['access_token'], '')
+    me = dexcom.get('v2/oauth2/token')
+    return jsonify(me.data)
 
-    session['dexcom_token'] = (
-        resp['oauth_token'],
-        resp['oauth_token_secret']
-    )
-    session['dexcom_user'] = resp['user_name']
-
-    flash('You were signed in as %s' % resp['screen_name'])
-    return redirect(next_url)
+    # next_url = request.args.get('next') or url_for('index')
+    # resp = dexcom.authorized_response()
+    # if resp is None:
+    #     flash(u'You denied the request to sign in.')
+    #     return redirect(next_url)
+    #
+    # session['dexcom_token'] = (
+    #     resp['access_token'],
+    #     resp['oauth_token_secret']
+    # )
+    # # session['dexcom_user'] = resp['user_name']
+    #
+    # flash('You were signed in as %s' % resp['access_token'])
+    # return redirect(next_url)
 
 @app.route('/', methods=['GET'])
 def index():
