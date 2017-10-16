@@ -1,4 +1,4 @@
-from flask import Flask, session, redirect
+from flask import Flask, session, redirect, url_for, request
 from flask_oauthlib.client import OAuth
 import os
 
@@ -26,9 +26,10 @@ def get_dexcom_token(token=None):
 def login():
     return dexcom.authorize(callback=url_for('oauth_authorized',
                 next=request.args.get('next') or request.referrer
-                or None))
+                or None, _external=True))
 
 @app.route('/oauth-authorized')
+# @dexcom.authorized_response()
 def oauth_authorized():
     next_url = request.args.get('next') or url_for('index')
     resp = dexcom.authorized_response()
