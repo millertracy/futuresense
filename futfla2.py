@@ -1,5 +1,5 @@
 from flask import Flask, url_for, session, jsonify
-from flask.ext.oauthlib.contrib.client import OAuth
+from flask_oauthlib.client import OAuth
 import os
 
 client_id = os.environ['DEX_CLIENT_ID']
