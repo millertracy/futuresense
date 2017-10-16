@@ -10,11 +10,11 @@ client_secret = os.environ['DEX_CLIENT_SECRET']
 redirect_uri = '34.215.61.65'
 
 dexcom = oauth.remote_app('dexcom',
-    base_url='https://sandbox-api.dexcom.com'
-    request_token_url=None
-    access_token_url='https://sandbox-api.dexcom.com/v1/oauth2/token'
-    authorize_url='https://sandbox-api.dexcom.com/v1/oauth2/login'
-    consumer_key=client_id
+    base_url='https://sandbox-api.dexcom.com',
+    request_token_url=None,
+    access_token_url='https://sandbox-api.dexcom.com/v1/oauth2/token',
+    authorize_url='https://sandbox-api.dexcom.com/v1/oauth2/login',
+    consumer_key=client_id,
     consumer_secret=client_secret
 )
 
