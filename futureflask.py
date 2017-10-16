@@ -28,6 +28,10 @@ def login():
                 next=request.args.get('next') or request.referrer
                 or None, _external=True))
 
+@app.route('/osenviron')
+def ose():
+    return os.environ['DEX_CLIENT_ID']
+
 @app.route('/oauth-authorized')
 # @dexcom.authorized_response()
 def oauth_authorized():
