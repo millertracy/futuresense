@@ -8,7 +8,7 @@ oauth = OAuth()
 
 client_id = os.environ['DEX_CLIENT_ID']
 client_secret = os.environ['DEX_CLIENT_SECRET']
-redirect_uri = '34.215.61.65'
+redirect = '34.215.61.65'
 
 # payload = "client_secret=" + self.client_secret + "&client_id=" + self.client_id + "&code=" + self.authcode + "&grant_type=authorization_code&redirect_uri=" + self.redirect_uri
 #
@@ -20,7 +20,8 @@ redirect_uri = '34.215.61.65'
 dexcom = oauth.remote_app('dexcom',
     app_key='DEXCOM',
     consumer_key=client_id,
-    consumer_secret=client_secret
+    consumer_secret=client_secret,
+    redirect_uri=redirect
 )
 
 app.config['DEXCOM'] = dict(
@@ -32,7 +33,7 @@ app.config['DEXCOM'] = dict(
     authorize_url='https://sandbox-api.dexcom.com/v1/oauth2/login',
     request_token_params={
         'client_id': client_id,
-        'redirect_uri': redirect_uri,
+        'redirect_uri': redirect,
         'response_type': 'code',
         'scope': 'offline_access'
         }
