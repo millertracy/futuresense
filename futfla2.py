@@ -62,9 +62,9 @@ def obtain_dexcom_token():
     return session.get('token')
 
 
-@dexcom.tokensaver
-def store_dexcom_token(token):
-    session['token'] = token
+# @dexcom.tokensaver
+# def store_dexcom_token(token):
+#     session['token'] = token
 
 
 if __name__ == '__main__':
