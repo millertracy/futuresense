@@ -29,7 +29,7 @@ app.config['DEXCOM'] = dict(
     base_url='https://sandbox-api.dexcom.com',
     request_token_url=None,
     access_token_url='https://sandbox-api.dexcom.com/v1/oauth2/token',
-    authorize_url='https://sandbox-api.dexcom.com/v1/oauth2/login,
+    authorize_url='https://sandbox-api.dexcom.com/v1/oauth2/login',
     request_token_params={
         'client_id': client_id,
         'redirect_uri': redirect_uri,
