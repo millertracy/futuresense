@@ -46,12 +46,7 @@ def get_dexcom_token():
 
 @app.route('/login')
 def login():
-    return dexcom.authorize(callback=url_for('oauth_authorized',
-                            _external=True))
-
-@app.route('/osenviron')
-def ose():
-    return os.environ['DEX_CLIENT_SECRET']
+    return dexcom.authorize(callback=url_for('oauth_authorized', _external=True))
 
 @app.route('/oauth-authorized')
 # @dexcom.authorized_handler
@@ -63,7 +58,7 @@ def oauth_authorized():
             request.args['error_description']
         )
     session['dexcom_token'] = (resp['access_token'], '')
-    me = dexcom.get('v2/oauth2/token')
+    me = dexcom.get('v1/oauth2/token')
     return jsonify(me.data)
 
     # next_url = request.args.get('next') or url_for('index')
@@ -88,6 +83,7 @@ def index():
 
 if __name__ == '__main__':
     app.secret_key = client_secret
+    app.redirect_uri = redirect
     oauth.init_app(app)
     app.debug = True
     app.run(host='0.0.0.0', threaded=True)
