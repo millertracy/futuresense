@@ -46,7 +46,7 @@ client_id = os.environ['DEX_CLIENT_ID']
 client_secret = os.environ['DEX_CLIENT_SECRET']
 authorization_base_url = 'https://sandbox-api.dexcom.com/v1/oauth2/login'
 token_url = 'https://sandbox-api.dexcom.com/v1/oauth2/login'
-redirect = 'http://34.215.61.65'
+redirect_u = '34.215.61.65'
 
 @app.route("/")
 def demo():
@@ -55,7 +55,7 @@ def demo():
     Redirect the user/resource owner to the OAuth provider (i.e. Dexcom)
     using an URL with a few key OAuth parameters.
     """
-    dexcom = OAuth2Session(client_id, redirect_uri=redirect)
+    dexcom = OAuth2Session(client_id, redirect_uri=redirect_u)
     authorization_url, state = dexcom.authorization_url(authorization_base_url)
 
     # State is used to prevent CSRF, keep this for later.
@@ -76,7 +76,7 @@ def callback():
 
     dexcom = OAuth2Session(client_id, state=session['oauth_state'], redirect_uri=redirect)
     token = dexcom.fetch_token(token_url, client_secret=client_secret,
-                              redirect_uri=redirect, authorization_response=request.url)
+                              redirect_uri=redirect_u, authorization_response=request.url)
 
     # At this point you can fetch protected resources but lets save
     # the token and show how this is done from a persisted token
@@ -90,8 +90,8 @@ def callback():
 def profile():
     """Fetching a protected resource using an OAuth 2 token.
     """
-    dexcom = OAuth2Session(client_id, token=session['oauth_token'], redirect_uri=redirect)
-    return jsonify(dexcom.get('https://api.dexcom.com/user').json())
+    dexcom = OAuth2Session(client_id, token=session['oauth_token'], redirect_uri=redirect_u)
+    return jsonify(dexcom.get('https://sandbox-api.dexcom.com/v1/oauth2/login').json())
 
 
 if __name__ == "__main__":
