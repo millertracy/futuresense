@@ -110,6 +110,8 @@ class FutureSense():
         time.sleep(2)
 
         for i in range(reps):
+            print("EGVS | Start Date:" + str(start + (plusX * i)) + " | End Date:" + str(start + (plusX * (i+1))))
+            # sys.stdout.flush()
             self.conn.request("GET", "/v1/users/self/egvs" + "?startDate=" +
                               str(start + (plusX * i)).replace(' ', 'T') +
                               "&endDate=" + str(start +
@@ -122,10 +124,9 @@ class FutureSense():
                 for egv in ast.literal_eval(egvs):
                     egv.update({'recordType': 'egv', 'units': units, 'rate': rate, 'user': self.currentuser})
                     if not self.docs.find_one(egv):
-                        self.docs.insert(egv)
+                        self.docs.insert_one(egv)
 
-                    # self.docs.insert_one(egv)
-                    print egv
+                    # print egv
 
 
     def get_calibrations(self, startday='01/01/2015', incr=90, reps=1):
@@ -145,6 +146,8 @@ class FutureSense():
         time.sleep(2)
 
         for i in range(reps):
+            print("CALIBRATIONS | Start Date:" + str(start + (plusX * i)) + " | End Date:" + str(start + (plusX * (i+1))))
+            # sys.stdout.flush()
             self.conn.request("GET", "/v1/users/self/calibrations" + "?startDate=" +
                               str(start + (plusX * i)).replace(' ', 'T') +
                               "&endDate=" + str(start +
@@ -157,10 +160,9 @@ class FutureSense():
                 for calib in ast.literal_eval(calibs):
                     calib.update({'recordType': 'calibration', 'user': self.currentuser})
                     if not self.docs.find_one(calib):
-                        self.docs.insert(calib)
+                        self.docs.insert_one(calib)
 
-                    # self.docs.insert_one(egv)
-                    print calib
+                    # print calib
 
 
     def get_events(self, startday='01/01/2015', incr=90, reps=1):
@@ -180,6 +182,8 @@ class FutureSense():
         time.sleep(2)
 
         for i in range(reps):
+            print("EVENTS | Start Date:" + str(start + (plusX * i)) + " | End Date:" + str(start + (plusX * (i+1))))
+            # sys.stdout.flush()
             self.conn.request("GET", "/v1/users/self/events" + "?startDate=" +
                               str(start + (plusX * i)).replace(' ', 'T') +
                               "&endDate=" + str(start +
@@ -192,10 +196,9 @@ class FutureSense():
                 for event in ast.literal_eval(events):
                     event.update({'recordType': 'event', 'user': self.currentuser})
                     if not self.docs.find_one(event):
-                        self.docs.insert(event)
+                        self.docs.insert_one(event)
 
-                    # self.docs.insert_one(egv)
-                    print event
+                    # print event
 
     def get_all(self, all_startday='01/01/2015', all_incr=90, all_reps=1):
         self.get_egvs(startday=all_startday, incr=all_incr, reps=all_reps)
@@ -254,6 +257,6 @@ class FutureSense():
 
         return events
 
-fs = FutureSense(user='sandbox1', sandbox=True)
+fs = FutureSense(user='sandbox5', sandbox=True)
 
-fs.get_all(all_startday='9/1/2016', all_incr=1)
+fs.get_all(all_startday='1/1/2016', all_reps=2)

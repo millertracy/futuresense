@@ -49,8 +49,8 @@ token_url = 'https://api.dexcom.com/v1/oauth2/login'
 redirect_u = '34.215.61.65'
 scp = ['offline_access']
 
-@app.route("/")
-def demo():
+@app.route("/login", methods=["GET"])
+def login():
     """Step 1: User Authorization.
 
     Redirect the user/resource owner to the OAuth provider (i.e. Dexcom)
@@ -75,7 +75,7 @@ def callback():
     in the redirect URL. We will use that to obtain an access token.
     """
 
-    dexcom = OAuth2Session(client_id, state=session['oauth_state'], redirect_uri=redirect)
+    dexcom = OAuth2Session(client_id, state=session['oauth_state'], redirect_uri=redirect, scope=scp)
     token = dexcom.fetch_token(token_url, client_secret=client_secret,
                               redirect_uri=redirect_u, authorization_response=request.url)
 
@@ -86,12 +86,12 @@ def callback():
 
     return redirect(url_for('.profile'))
 
-
+# http://requests-oauthlib.readthedocs.io/en/latest/oauth2_workflow.html
 @app.route("/profile", methods=["GET"])
 def profile():
     """Fetching a protected resource using an OAuth 2 token.
     """
-    dexcom = OAuth2Session(client_id, token=session['oauth_token'], redirect_uri=redirect_u)
+    dexcom = OAuth2Session(client_id, token=session['oauth_token'], redirect_uri=redirect_u, scope=scp)
     return jsonify(dexcom.get('https://api.dexcom.com/v1/oauth2/login').json())
 
 
