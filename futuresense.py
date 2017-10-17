@@ -47,6 +47,12 @@ class FutureSense():
         self.currentuser = user
         self.authcode = self.users[self.currentuser]
 
+        # Get initial authcode
+        self.auth_time = pd.datetime.now()
+        self.auth_life = dt.timedelta(seconds=540)
+
+        self.get_auth()
+
 
     def get_auth(self):
         '''
@@ -71,30 +77,37 @@ class FutureSense():
         self.refresh_token = result['refresh_token']
         self.headers = {'authorization': "Bearer " + self.access_token}
 
+        self.auth_time = pd.datetime.now()
+
 
     def keepalive(self):
         '''
-        Continuously refresh the authorization connection every 9 minutes,
-        until explicitly ordered to stop.
-
-        Is this needed? Need to figure out threading this in the background.
+        Refresh the authorization token if it is close to expiring (tokens
+        expire after 10 minutes, this will refresh after 9 minutes). Only works
+        when program is running continuously - if token has expired, call get_auth() method to get a new token.
         '''
-        payload = "client_secret=" + self.client_secret + "&client_id=" + self.client_id + "&refresh_token=" + self.refresh_token + "&grant_type=refresh_token&redirect_uri=" + self.redirect_uri
+        if pd.datetime.now() > (self.auth_time + dt.timedelta(seconds=599)):
+            self.get_auth()
+        else:
 
-        headers = {
-            'content-type': "application/x-www-form-urlencoded",
-            'cache-control': "no-cache"
-            }
+            payload = "client_secret=" + self.client_secret + "&client_id=" + self.client_id + "&refresh_token=" + self.refresh_token + "&grant_type=refresh_token&redirect_uri=" + self.redirect_uri
 
-        self.conn.request("POST", "/v1/oauth2/token", payload, headers)
+            headers = {
+                'content-type': "application/x-www-form-urlencoded",
+                'cache-control': "no-cache"
+                }
 
-        res = conn.getresponse()
-        data = res.read()
+            self.conn.request("POST", "/v1/oauth2/token", payload, headers)
 
-        result = ast.literal_eval(data)
-        self.access_token = result['access_token']
-        self.refresh_token = result['refresh_token']
-        self.headers = {'authorization': "Bearer " + self.access_token}
+            res = conn.getresponse()
+            data = res.read()
+
+            result = ast.literal_eval(data)
+            self.access_token = result['access_token']
+            self.refresh_token = result['refresh_token']
+            self.headers = {'authorization': "Bearer " + self.access_token}
+
+            self.auth_time = pd.datetime.now()
 
 
     def get_egvs(self, startday='01/01/2015', incr=90, reps=1):
@@ -102,12 +115,12 @@ class FutureSense():
         Get the Estimated Glucose Values (EGVs) for the specified date range,
         and stores the results in the DB
         '''
+        if pd.datetime.now() > (self.auth_time + self.auth_life):
+            self.keepalive()
+            time.sleep(1)
 
         start = pd.Timestamp(startday)
         plusX = dt.timedelta(days=incr)
-
-        self.get_auth()
-        time.sleep(2)
 
         for i in range(reps):
             print("EGVS | Start Date:" + str(start + (plusX * i)) + " | End Date:" + str(start + (plusX * (i+1))))
@@ -138,12 +151,12 @@ class FutureSense():
         glucose level using a glucometer, and inputs the reading into the CGM
         software.
         '''
+        if pd.datetime.now() > (self.auth_time + self.auth_life):
+            self.keepalive()
+            time.sleep(1)
 
         start = pd.Timestamp(startday)
         plusX = dt.timedelta(days=incr)
-
-        self.get_auth()
-        time.sleep(2)
 
         for i in range(reps):
             print("CALIBRATIONS | Start Date:" + str(start + (plusX * i)) + " | End Date:" + str(start + (plusX * (i+1))))
@@ -174,12 +187,12 @@ class FutureSense():
         (recorded as grams of carbohydrates), consumed alcohol, or experienced
         stress - all of which can have an impact on glucose levels.
         '''
+        if pd.datetime.now() > (self.auth_time + self.auth_life):
+            self.keepalive()
+            time.sleep(1)
 
         start = pd.Timestamp(startday)
         plusX = dt.timedelta(days=incr)
-
-        self.get_auth()
-        time.sleep(2)
 
         for i in range(reps):
             print("EVENTS | Start Date:" + str(start + (plusX * i)) + " | End Date:" + str(start + (plusX * (i+1))))
@@ -259,4 +272,4 @@ class FutureSense():
 
 fs = FutureSense(user='sandbox5', sandbox=True)
 
-fs.get_all(all_startday='1/1/2016', all_reps=2)
+fs.get_all(all_startday='1/1/2016', all_reps=4)
