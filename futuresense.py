@@ -16,6 +16,7 @@ import json
 import re
 import pandas as pd
 import pymongo
+from concurrent import futures
 
 
 class FutureSense():
@@ -60,6 +61,7 @@ class FutureSense():
         else:
             self.conn = http.HTTPSConnection("api.dexcom.com")
 
+
     def get_auth(self):
         '''
         Connects to the API to request an access token, enabling queries
@@ -90,7 +92,6 @@ class FutureSense():
         self.headers = {'authorization': "Bearer " + self.access_token}
 
         self.auth_time = pd.datetime.now()
-        print(self.access_token)
 
 
     def keepalive(self):
@@ -139,12 +140,22 @@ class FutureSense():
         print("No need to refresh")
 
 
+    def groups(self, num_subs, d):
+        d = ast.literal_eval(d)
+        size = (len(d) / num_subs)
+        if len(d) % num_subs != 0:
+            size += 1
+        result = []
+        for i in range(num_subs):
+            result.append(d[i*size:(i+1)*size])
+        return result
+
+
     def get_egvs(self, startday='01/01/2015', incr=30, reps=1):
         '''
         Get the Estimated Glucose Values (EGVs) for the specified date range,
         and stores the results in the DB
         '''
-
         start = pd.Timestamp(startday)
         plusX = dt.timedelta(days=incr)
 
@@ -168,16 +179,6 @@ class FutureSense():
                     continue
                 break
 
-            # self.conn.request("GET", "/v1/users/self/events" + "?startDate=" + str(start + (plusX * i)).replace(' ', 'T') + "&endDate=" + str(start + (plusX * (i+1))).replace(' ', 'T'), headers=self.headers)
-            #
-            # res = self.conn.getresponse()
-
-            # try:
-            #     res = self.conn.getresponse()
-            # except http.BadStatusLine:
-            #     print("Bad connection!")
-
-
             if int(res.status) != 200:
                 raise ValueError("Request not successful.  Status =     {}".format(res.status))
 
@@ -185,16 +186,45 @@ class FutureSense():
                 units, rate, egvs = self.egv_decode(data)
 
             if egvs != None:
-                for egv in ast.literal_eval(egvs):
-                    egv.update({'recordType': 'egv', 'units': units, 'rate': rate, 'user': self.currentuser})
-                    print egv
-                    # if not self.docs.find_one(egv):
-                    #     self.docs.insert_one(egv)
-                    self.docs.update_one(egv, {'$setOnInsert': egv}, upsert=True)
+                executor = futures.ThreadPoolExecutor(20)
+                future = [executor.submit(self.write_egvs, units, rate, group)
+                            for group in self.groups(20, egvs)]
+                futures.wait(future)
             else:
                 print("Got no egvs!")
 
 
+    def egv_decode(self, data):
+        '''
+        Unpack the data payload for EGVs and convert the list of records
+        into individual records.
+        '''
+        # expected units = 'mg/dL'
+        units_re = re.compile('(?<=\"unit\":\").+(?=\",\"rateUnit)')
+        units = units_re.search(data).group()
+
+        # expected rate = 'mg/dL/min'
+        rate_re = re.compile('(?<=\"rateUnit\":\").+(?=\",\"egvs)')
+        rate = rate_re.search(data).group()
+
+        # gets EGVs as a list of dicts in str format
+        egvs_re = re.compile('(?<=:\[).+(?=\]})')
+        try:
+            egvs = egvs_re.search(data).group().replace('null', '"null"')
+        except:
+            egvs = None
+
+        return units, rate, egvs
+
+
+    def write_egvs(self, units, rate, egvs):
+        '''
+        Writes EGV results to the Mongo DB
+        '''
+        for egv in egvs:
+            egv.update({'recordType': 'egv', 'units': units, 'rate': rate, 'user': self.currentuser})
+            print egv
+            self.docs.update_one(egv, {'$setOnInsert': egv}, upsert=True)
 
 
     def get_calibrations(self, startday='01/01/2015', incr=30, reps=1):
@@ -206,7 +236,6 @@ class FutureSense():
         glucose level using a glucometer, and inputs the reading into the CGM
         software.
         '''
-
         start = pd.Timestamp(startday)
         plusX = dt.timedelta(days=incr)
 
@@ -235,16 +264,36 @@ class FutureSense():
             if data != None:
                 calibs = self.calib_decode(data)
             if calibs != None:
-                for calib in ast.literal_eval(calibs):
-                    calib.update({'recordType': 'calibration', 'user': self.currentuser})
-                    print calib
-                    # if not self.docs.find_one(calib):
-                    #     self.docs.insert_one(calib)
-                    self.docs.update_one(calib, {'$setOnInsert': calib}, upsert=True)
+                executor = futures.ThreadPoolExecutor(5)
+                future = [executor.submit(self.write_calibs, group)
+                            for group in self.groups(5, calibs)]
+                futures.wait(future)
             else:
                 print("Got no calibrations!")
 
-                    # print calib
+
+    def calib_decode(self, data):
+        '''
+        Unpack the data payload for calibrations and convert the list of records
+        into individual records.
+        '''
+        calib_re = re.compile('(?<=:\[).+(?=\]})')
+        try:
+            calibs = calib_re.search(data).group().replace('null', '"null"')
+        except:
+            calibs = None
+
+        return calibs
+
+
+    def write_calibs(self, calibs):
+        '''
+        Write calibration records to Mongo DB
+        '''
+        for calib in calibs:
+            calib.update({'recordType': 'calibration', 'user': self.currentuser})
+            print calib
+            self.docs.update_one(calib, {'$setOnInsert': calib}, upsert=True)
 
 
     def get_events(self, startday='01/01/2015', incr=30, reps=1):
@@ -256,7 +305,6 @@ class FutureSense():
         (recorded as grams of carbohydrates), consumed alcohol, or experienced
         stress - all of which can have an impact on glucose levels.
         '''
-
         start = pd.Timestamp(startday)
         plusX = dt.timedelta(days=incr)
 
@@ -285,58 +333,13 @@ class FutureSense():
             if data != None:
                 events = self.event_decode(data)
             if events != None:
-                for event in ast.literal_eval(events):
-                    event.update({'recordType': 'event', 'user': self.currentuser})
-                    print event
-                    # if not self.docs.find_one(event):
-                    #     self.docs.insert_one(event)
-                    self.docs.update_one(event, {'$setOnInsert': event}, upsert=True)
+                executor = futures.ThreadPoolExecutor(10)
+                future = [executor.submit(self.write_events, group)
+                            for group in self.groups(10, events)]
+                futures.wait(future)
+
             else:
                 print("Got no events!")
-
-
-
-    def get_all(self, all_startday='01/01/2015', all_incr=30, all_reps=1):
-        self.get_egvs(startday=all_startday, incr=all_incr, reps=all_reps)
-        self.get_calibrations(startday=all_startday, incr=all_incr, reps=all_reps)
-        self.get_events(startday=all_startday, incr=all_incr, reps=all_reps)
-
-    def egv_decode(self, data):
-        '''
-        Unpack the data payload for EGVs and convert the list of records
-        into individual records.
-        '''
-        # expected units = 'mg/dL'
-        units_re = re.compile('(?<=\"unit\":\").+(?=\",\"rateUnit)')
-        units = units_re.search(data).group()
-
-        # expected rate = 'mg/dL/min'
-        rate_re = re.compile('(?<=\"rateUnit\":\").+(?=\",\"egvs)')
-        rate = rate_re.search(data).group()
-
-        # gets EGVs as a list of dicts in str format
-        egvs_re = re.compile('(?<=:\[).+(?=\]})')
-        try:
-            egvs = egvs_re.search(data).group().replace('null', '"null"')
-        except:
-            egvs = None
-
-        return units, rate, egvs
-
-
-    def calib_decode(self, data):
-        '''
-        Unpack the data payload for calibrations and convert the list of records
-        into individual records.
-        '''
-
-        calib_re = re.compile('(?<=:\[).+(?=\]})')
-        try:
-            calibs = calib_re.search(data).group().replace('null', '"null"')
-        except:
-            calibs = None
-
-        return calibs
 
 
     def event_decode(self, data):
@@ -344,7 +347,6 @@ class FutureSense():
         Unpack the data payload for events and convert the list of records
         into individual records.
         '''
-
         events_re = re.compile('(?<=:\[).+(?=\]})')
         try:
             events = events_re.search(data).group().replace('null', '"null"')
@@ -353,7 +355,18 @@ class FutureSense():
 
         return events
 
-# fs = FutureSense(user='sandbox3', sandbox=True)
-# # raise CannotSendRequest
-#
-# fs.get_all(all_startday='9/20/2015', all_reps=3)
+
+    def write_events(self, events):
+        '''
+        Write event records to Mongo DB
+        '''
+        for event in events:
+            event.update({'recordType': 'event', 'user': self.currentuser})
+            print event
+            self.docs.update_one(event, {'$setOnInsert': event}, upsert=True)
+
+
+    def get_all(self, all_startday='01/01/2015', all_incr=30, all_reps=1):
+        self.get_egvs(startday=all_startday, incr=all_incr, reps=all_reps)
+        self.get_calibrations(startday=all_startday, incr=all_incr, reps=all_reps)
+        self.get_events(startday=all_startday, incr=all_incr, reps=all_reps)
