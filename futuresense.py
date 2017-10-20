@@ -49,6 +49,9 @@ class FutureSense():
 
         self.get_auth()
 
+        # find last record already in the Mongo DB
+        self.last_record = self.find_last_record()
+
 
     def connect(self):
         '''
@@ -151,11 +154,13 @@ class FutureSense():
         return result
 
 
-    def get_egvs(self, startday='01/01/2015', incr=30, reps=1):
+    def get_egvs(self, startday=None, incr=7, reps=1):
         '''
         Get the Estimated Glucose Values (EGVs) for the specified date range,
         and stores the results in the DB
         '''
+        if not startday:
+            startday = self.last_record
         start = pd.Timestamp(startday)
         plusX = dt.timedelta(days=incr)
 
@@ -180,7 +185,12 @@ class FutureSense():
                 break
 
             if int(res.status) != 200:
-                raise ValueError("Request not successful.  Status =     {}".format(res.status))
+                try:
+                    if ast.literal_eval(data.replace('null', '"null"'))['errors']['message'] == " - dates should not be in the future - ":
+                        print("Invalid start date - beyond end of available data.")
+                        return
+                except:
+                    raise ValueError("Request not successful.  Status =     {}".format(res.status))
 
             if data != None:
                 units, rate, egvs = self.egv_decode(data)
@@ -227,7 +237,7 @@ class FutureSense():
             self.docs.update_one(egv, {'$setOnInsert': egv}, upsert=True)
 
 
-    def get_calibrations(self, startday='01/01/2015', incr=30, reps=1):
+    def get_calibrations(self, startday=None, incr=7, reps=1):
         '''
         Get the calibration readings for the specified date range, and
         stores the results in the DB.
@@ -236,6 +246,8 @@ class FutureSense():
         glucose level using a glucometer, and inputs the reading into the CGM
         software.
         '''
+        if not startday:
+            startday = self.last_record
         start = pd.Timestamp(startday)
         plusX = dt.timedelta(days=incr)
 
@@ -259,7 +271,12 @@ class FutureSense():
                     continue
                 break
             if int(res.status) != 200:
-                raise ValueError("Request not successful.  Status =     {}".format(res.status))
+                try:
+                    if ast.literal_eval(data.replace('null', '"null"'))['errors']['message'] == " - dates should not be in the future - ":
+                        print("Invalid start date - beyond end of available data.")
+                        return
+                except:
+                    raise ValueError("Request not successful.  Status =     {}".format(res.status))
 
             if data != None:
                 calibs = self.calib_decode(data)
@@ -296,7 +313,7 @@ class FutureSense():
             self.docs.update_one(calib, {'$setOnInsert': calib}, upsert=True)
 
 
-    def get_events(self, startday='01/01/2015', incr=30, reps=1):
+    def get_events(self, startday=None, incr=7, reps=1):
         '''
         Get event data for the specified date range, and stores the results
         in the DB.
@@ -305,6 +322,8 @@ class FutureSense():
         (recorded as grams of carbohydrates), consumed alcohol, or experienced
         stress - all of which can have an impact on glucose levels.
         '''
+        if not startday:
+            startday = self.last_record
         start = pd.Timestamp(startday)
         plusX = dt.timedelta(days=incr)
 
@@ -328,7 +347,12 @@ class FutureSense():
                     continue
                 break
             if int(res.status) != 200:
-                raise ValueError("Request not successful.  Status =     {}".format(res.status))
+                try:
+                    if ast.literal_eval(data.replace('null', '"null"'))['errors']['message'] == " - dates should not be in the future - ":
+                        print("Invalid start date - beyond end of available data.")
+                        return
+                except:
+                    raise ValueError("Request not successful.  Status =     {}".format(res.status))
 
             if data != None:
                 events = self.event_decode(data)
@@ -366,7 +390,14 @@ class FutureSense():
             self.docs.update_one(event, {'$setOnInsert': event}, upsert=True)
 
 
-    def get_all(self, all_startday='01/01/2015', all_incr=30, all_reps=1):
+    def get_all(self, all_startday=None, all_incr=7, all_reps=1):
         self.get_egvs(startday=all_startday, incr=all_incr, reps=all_reps)
         self.get_calibrations(startday=all_startday, incr=all_incr, reps=all_reps)
         self.get_events(startday=all_startday, incr=all_incr, reps=all_reps)
+
+    def find_last_record(self):
+        try:
+            end_date = self.docs.find_one({'user': self.currentuser}, projection={'displayTime': True, '_id': False}, sort=[('displayTime', pymongo.DESCENDING)])
+            return pd.Timestamp(end_date['displayTime']).date()
+        except:
+            return '1/1/2015'
