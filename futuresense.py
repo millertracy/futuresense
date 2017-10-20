@@ -49,9 +49,6 @@ class FutureSense():
 
         self.get_auth()
 
-        # find last record already in the Mongo DB
-        self.last_record = self.find_last_record()
-
 
     def connect(self):
         '''
@@ -160,7 +157,7 @@ class FutureSense():
         and stores the results in the DB
         '''
         if not startday:
-            startday = self.last_record
+            startday = self.find_last_record(recordType='egv')
         start = pd.Timestamp(startday)
         plusX = dt.timedelta(days=incr)
 
@@ -247,7 +244,7 @@ class FutureSense():
         software.
         '''
         if not startday:
-            startday = self.last_record
+            startday = self.find_last_record(recordType='calibration')
         start = pd.Timestamp(startday)
         plusX = dt.timedelta(days=incr)
 
@@ -323,7 +320,7 @@ class FutureSense():
         stress - all of which can have an impact on glucose levels.
         '''
         if not startday:
-            startday = self.last_record
+            startday = self.find_last_record(recordType='event')
         start = pd.Timestamp(startday)
         plusX = dt.timedelta(days=incr)
 
@@ -395,9 +392,9 @@ class FutureSense():
         self.get_calibrations(startday=all_startday, incr=all_incr, reps=all_reps)
         self.get_events(startday=all_startday, incr=all_incr, reps=all_reps)
 
-    def find_last_record(self):
+    def find_last_record(self, recordType):
         try:
-            end_date = self.docs.find_one({'user': self.currentuser}, projection={'displayTime': True, '_id': False}, sort=[('displayTime', pymongo.DESCENDING)])
+            end_date = self.docs.find_one({'user': self.currentuser, 'recordType': recordType}, projection={'displayTime': True, '_id': False}, sort=[('displayTime', pymongo.DESCENDING)])
             return pd.Timestamp(end_date['displayTime']).date()
         except:
             return '1/1/2015'
