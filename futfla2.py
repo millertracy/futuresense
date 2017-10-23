@@ -75,8 +75,8 @@ def register():
 def signin():
     return render_template("signin.html")
 
-@app.route("/authorize", methods=["POST"])
-def login():
+@app.route("/authorize", methods=["GET", "POST"])
+def authorize():
     """Step 1: User Authorization.
 
     Redirect the user/resource owner to the OAuth provider (i.e. Dexcom)
