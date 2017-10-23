@@ -51,22 +51,27 @@ scp = ['offline_access']
 
 @app.route("/", methods=["GET"])
 @app.route("/index", methods=["GET"])
+@app.route("/index.html", methods=["GET"])
 def index():
     return render_template("index.html")
 
 @app.route("/about", methods=["GET"])
+@app.route("/about.html", methods=["GET"])
 def about():
     return render_template("about.html")
 
 @app.route("/contact", methods=["GET"])
+@app.route("/contact.html", methods=["GET"])
 def contact():
     return render_template("contact.html")
 
 @app.route("/register", methods=["GET"])
+@app.route("/register.html", methods=["GET"])
 def register():
     return render_template("register.html")
 
 @app.route("/signin", methods=["GET"])
+@app.route("/signin.html", methods=["GET"])
 def signin():
     return render_template("signin.html")
 
