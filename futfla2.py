@@ -33,7 +33,7 @@
 # )
 
 from requests_oauthlib import OAuth2Session
-from flask import Flask, request, redirect, session, url_for
+from flask import Flask, request, redirect, session, url_for, render_template
 from flask.json import jsonify
 import os
 
@@ -41,13 +41,34 @@ app = Flask(__name__)
 
 
 # This information is obtained upon registration of a new dexcom OAuth
-# application here: https://dexcom.com/settings/applications/new
+# application
 client_id = os.environ['DEX_CLIENT_ID']
 client_secret = os.environ['DEX_CLIENT_SECRET']
 authorization_base_url = 'https://api.dexcom.com/v1/oauth2/login'
 token_url = 'https://api.dexcom.com/v1/oauth2/login'
-redirect_u = '34.215.61.65'
+redirect_u = 'http://theglucoseguardian.com'
 scp = ['offline_access']
+
+@app.route("/", methods=["GET"])
+@app.route("/index", methods=["GET"])
+def index():
+    return render_template("index.html")
+
+@app.route("/about", methods=["GET"])
+def about():
+    return render_template("about.html")
+
+@app.route("/contact", methods=["GET"])
+def contact():
+    return render_template("contact.html")
+
+@app.route("/register", methods=["GET"])
+def register():
+    return render_template("register.html")
+
+@app.route("/signin", methods=["GET"])
+def signin():
+    return render_template("signin.html")
 
 @app.route("/login", methods=["GET"])
 def login():
@@ -62,7 +83,6 @@ def login():
     # State is used to prevent CSRF, keep this for later.
     session['oauth_state'] = state
     return redirect(authorization_url)
-
 
 # Step 2: User authorization, this happens on the provider.
 
@@ -93,7 +113,6 @@ def profile():
     """
     dexcom = OAuth2Session(client_id, token=session['oauth_token'], redirect_uri=redirect_u, scope=scp)
     return jsonify(dexcom.get('https://api.dexcom.com/v1/oauth2/login').json())
-
 
 if __name__ == "__main__":
     # This allows us to use a plain HTTP callback
