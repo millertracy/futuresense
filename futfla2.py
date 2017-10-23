@@ -46,7 +46,7 @@ client_id = os.environ['DEX_CLIENT_ID']
 client_secret = os.environ['DEX_CLIENT_SECRET']
 authorization_base_url = 'https://api.dexcom.com/v1/oauth2/login'
 token_url = 'https://api.dexcom.com/v1/oauth2/login'
-redirect_u = 'http://theglucoseguardian.com'
+redirect_u = 'http://theglucoseguardian.com/callback'
 scp = ['offline_access']
 
 @app.route("/", methods=["GET"])
@@ -75,7 +75,7 @@ def register():
 def signin():
     return render_template("signin.html")
 
-@app.route("/login", methods=["GET"])
+@app.route("/authorize", methods=["POST"])
 def login():
     """Step 1: User Authorization.
 
