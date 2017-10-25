@@ -387,10 +387,73 @@ class FutureSense():
             self.docs.update_one(event, {'$setOnInsert': event}, upsert=True)
 
 
+    def get_bounds(self, startday=None, incr=7):
+        '''
+        Get user devices and preferences
+        '''
+        if not startday:
+            startday = self.find_last_record(recordType='egv')
+        start = pd.Timestamp(startday)
+        plusX = dt.timedelta(days=incr)
+
+        self.checktoken()
+        self.connect()
+
+        print("Bounds:")
+
+        while True:
+            try:
+                self.conn.request("GET", "/v1/users/self/devices" + "?startDate=" + str(start).replace(' ', 'T') + "&endDate=" + str(start + plusX).replace(' ', 'T'), headers=self.headers)
+                res = self.conn.getresponse()
+                data = res.read()
+            except http.BadStatusLine:
+                print("Bad connection, retrying in 10 seconds.")
+                time.sleep(10)
+                self.get_auth()
+                time.sleep(1)
+                continue
+            break
+        if int(res.status) != 200:
+            try:
+                if ast.literal_eval(data.replace('null', '"null"'))['errors']['message'] == " - dates should not be in the future - ":
+                    print("Invalid start date - beyond end of available data.")
+                    return
+            except:
+                raise ValueError("Request not successful.  Status =     {}".format(res.status))
+
+        if data != None:
+            high, low = self.device_decode(data)
+
+        self.write_bounds(high, low)
+
+
+    def bounds_decode(self, data):
+        high_re = re.compile('(?<=:\"high","value":)\d+(?=,"unit")')
+        try:
+            high = int(high_re.search(data).group().replace('null', '"null"'))
+        except:
+            high = 200
+
+        low_re = re.compile('(?<=:\"low","value":)\d+(?=,"unit")')
+        try:
+            low = int(low_re.search(data).group().replace('null', '"null"'))
+        except:
+            low = 80
+
+        return high, low
+
+
+    def write_bounds(self, high, low):
+        bounds = {'recordType': 'bounds', 'user': self.currentuser, 'high': high, 'low': low}
+        print bounds
+        self.docs.update_one(bounds, {'$setOnInsert': bounds}, upsert=True)
+
+
     def get_all(self, all_startday=None, all_incr=7, all_reps=1):
         self.get_egvs(startday=all_startday, incr=all_incr, reps=all_reps)
         self.get_calibrations(startday=all_startday, incr=all_incr, reps=all_reps)
         self.get_events(startday=all_startday, incr=all_incr, reps=all_reps)
+        self.get_bounds(startday=all_startday, incr=all_incr)
 
     def find_last_record(self, recordType):
         try:

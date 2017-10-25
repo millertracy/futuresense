@@ -36,12 +36,14 @@ from requests_oauthlib import OAuth2Session
 from flask import Flask, request, redirect, session, url_for, render_template
 from flask.json import jsonify
 import os
+import boto3
+
 
 app = Flask(__name__)
 
+aws_client = boto3.client('cognito-identity')
 
-# This information is obtained upon registration of a new dexcom OAuth
-# application
+# Client keys are stored in .bashrc as environment variables
 client_id = os.environ['DEX_CLIENT_ID']
 client_secret = os.environ['DEX_CLIENT_SECRET']
 authorization_base_url = 'https://api.dexcom.com/v1/oauth2/login'
@@ -99,25 +101,25 @@ def callback():
     callback URL. With this redirection comes an authorization code included
     in the redirect URL. We will use that to obtain an access token.
     """
-
-    dexcom = OAuth2Session(client_id, state=session['oauth_state'], redirect_uri=redirect, scope=scp)
-    token = dexcom.fetch_token(token_url, client_secret=client_secret,
-                              redirect_uri=redirect_u, authorization_response=request.url)
-
+    authcode = request.args.get('code', '')
+    return authcode
+    # dexcom = OAuth2Session(client_id, state=session['oauth_state'], redirect_uri=redirect, scope=scp)
+    # token = dexcom.fetch_token(token_url, client_secret=client_secret,
+    #                           redirect_uri=redirect_u, authorization_response=request.url)
     # At this point you can fetch protected resources but lets save
     # the token and show how this is done from a persisted token
     # in /profile.
-    session['oauth_token'] = token
-
-    return redirect(url_for('.profile'))
+    # session['oauth_token'] = token
+    #
+    # return redirect(url_for('.profile'))
 
 # http://requests-oauthlib.readthedocs.io/en/latest/oauth2_workflow.html
-@app.route("/profile", methods=["GET"])
-def profile():
-    """Fetching a protected resource using an OAuth 2 token.
-    """
-    dexcom = OAuth2Session(client_id, token=session['oauth_token'], redirect_uri=redirect_u, scope=scp)
-    return jsonify(dexcom.get('https://api.dexcom.com/v1/oauth2/login').json())
+# @app.route("/profile", methods=["GET"])
+# def profile():
+#     """Fetching a protected resource using an OAuth 2 token.
+#     """
+#     dexcom = OAuth2Session(client_id, token=session['oauth_token'], redirect_uri=redirect_u, scope=scp)
+#     return jsonify(dexcom.get('https://api.dexcom.com/v1/oauth2/login').json())
 
 if __name__ == "__main__":
     # This allows us to use a plain HTTP callback
