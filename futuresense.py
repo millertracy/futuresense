@@ -25,16 +25,17 @@ class FutureSense():
         self.refresh_token = ''
         self.client_id = os.environ['DEX_CLIENT_ID']
         self.client_secret = os.environ['DEX_CLIENT_SECRET']
-        self.redirect_uri = '34.215.61.65'
+        #self.redirect_uri = '34.215.61.65'
+        self.redirect_uri = 'http://theglucoseguardian.com/callback'
 
         self.sandbox = sandbox
         self.headers = {}
 
         self.connect()
 
-        self.mc = pymongo.MongoClient()  # Connect to the MongoDB server using default settings
-        self.db = self.mc['future_sense']  # Use (or create) a database called 'future_sense'
-        self.docs = self.db['docs'] # Use (or create) a collection called 'docs'
+        self.mc = pymongo.MongoClient()  # Connect to the MongoDB server
+        self.db = self.mc['future_sense']  # Use the 'future_sense' DB
+        self.docs = self.db['docs'] # Use collection 'docs'
 
         # open the list of users (in username:authcode format) to get the
         # authorization code for the current user
@@ -87,6 +88,7 @@ class FutureSense():
             break
 
         result = ast.literal_eval(data)
+        print(result)
         self.access_token = result['access_token']
         self.refresh_token = result['refresh_token']
         self.headers = {'authorization': "Bearer " + self.access_token}
