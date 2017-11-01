@@ -20,7 +20,7 @@ from concurrent import futures
 
 
 class FutureSense():
-    def __init__(self, user, sandbox=False):
+    def __init__(self, user, auth=None, sandbox=False):
         self.access_token = ''
         self.refresh_token = ''
         self.client_id = os.environ['DEX_CLIENT_ID']
@@ -42,13 +42,14 @@ class FutureSense():
         with open('users.csv', 'r') as f:
             self.users = ast.literal_eval(f.read())
         self.currentuser = user
-        self.authcode = self.users[self.currentuser]
+        self.refresh_token = self.users[self.currentuser]
 
         # Get initial authcode
-        self.auth_time = pd.datetime.now()
+        self.auth_time = pd.datetime.now() - dt.timedelta(seconds=600)
         self.auth_life = dt.timedelta(seconds=540)
+        self.authcode = auth
 
-        self.get_auth()
+        self.checktoken()
 
 
     def connect(self):
@@ -65,10 +66,11 @@ class FutureSense():
 
     def get_auth(self):
         '''
-        Connects to the API to request an access token, enabling queries
-        for user data
+        Used to get initial auth token and refresh token after user grants
+        HIPAA authorization to access to their data
         '''
         self.connect()
+
 
         payload = "client_secret=" + self.client_secret + "&client_id=" + self.client_id + "&code=" + self.authcode + "&grant_type=authorization_code&redirect_uri=" + self.redirect_uri
 
@@ -93,53 +95,65 @@ class FutureSense():
         self.refresh_token = result['refresh_token']
         self.headers = {'authorization': "Bearer " + self.access_token}
 
+        # Update user refresh token in DB
+        with open('users.csv', 'w') as f:
+            self.users = ast.literal_eval(f.read())
+            self.users[self.currentuser] = self.refresh_token
+            f.write(self.users)
+
         self.auth_time = pd.datetime.now()
 
 
     def keepalive(self):
         '''
-        Refresh the authorization token if it is close to expiring (tokens
-        expire after 10 minutes, this will refresh after 9 minutes). Only works
-        when program is running continuously - if token has expired, call get_auth() method to get a new token.
+        Refresh the authorization token if it is close to expiring or has
+        already expired (tokens expire after 10 minutes, this will refresh
+         after 9 minutes).
         '''
-        if pd.datetime.now() > (self.auth_time + dt.timedelta(seconds=599)):
-            self.get_auth()
-        else:
-            self.connect()
+        self.connect()
 
-            payload = "client_secret=" + self.client_secret + "&client_id=" + self.client_id + "&refresh_token=" + self.refresh_token + "&grant_type=refresh_token&redirect_uri=" + self.redirect_uri
+        payload = "client_secret=" + self.client_secret + "&client_id=" + self.client_id + "&refresh_token=" + self.refresh_token + "&grant_type=refresh_token&redirect_uri=" + self.redirect_uri
 
-            headers = {
-                'content-type': "application/x-www-form-urlencoded",
-                'cache-control': "no-cache"
-                }
+        headers = {
+            'content-type': "application/x-www-form-urlencoded",
+            'cache-control': "no-cache"
+            }
 
-            while True:
-                try:
-                    self.conn.request("POST", "/v1/oauth2/token", payload, headers)
-                    res = self.conn.getresponse()
-                    data = res.read()
-                except http.CannotSendRequest:
-                    print("Resetting connection.")
-                    self.connect()
-                break
+        while True:
+            try:
+                self.conn.request("POST", "/v1/oauth2/token", payload, headers)
+                res = self.conn.getresponse()
+                data = res.read()
+            except http.CannotSendRequest:
+                print("Resetting connection.")
+                self.connect()
+            break
 
-            result = ast.literal_eval(data)
-            self.access_token = result['access_token']
-            self.refresh_token = result['refresh_token']
-            self.headers = {'authorization': "Bearer " + self.access_token}
+        result = ast.literal_eval(data)
+        self.access_token = result['access_token']
+        self.refresh_token = result['refresh_token']
+        self.headers = {'authorization': "Bearer " + self.access_token}
 
-            self.auth_time = pd.datetime.now()
+        # Update user refresh token in DB
+        with open('users.csv', 'w') as f:
+            self.users = ast.literal_eval(f.read())
+            self.users[self.currentuser] = self.refresh_token
+            f.write(self.users)
+
+        self.auth_time = pd.datetime.now()
 
 
     def checktoken(self):
         print("Checking Token")
-        if pd.datetime.now() > (self.auth_time + self.auth_life):
+        if pd.datetime.now() > (self.auth_time + self.auth_life) and self.authcode == None:
             print("Getting new token")
             self.keepalive()
             print("Token Recieved")
             time.sleep(1)
-        print("No need to refresh")
+        elif self.authcode != None:
+            self.get_auth()
+        else:
+            print("No need to refresh")
 
 
     def groups(self, num_subs, d):

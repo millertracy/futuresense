@@ -102,6 +102,9 @@ def callback():
     in the redirect URL. We will use that to obtain an access token.
     """
     authcode = request.args.get('code', '')
+    fs = FutureSense(user=user, auth=authcode, sandbox=False)
+    fs.get_all(all_reps=4)
+
     return authcode
     # dexcom = OAuth2Session(client_id, state=session['oauth_state'], redirect_uri=redirect, scope=scp)
     # token = dexcom.fetch_token(token_url, client_secret=client_secret,
