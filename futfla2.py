@@ -41,7 +41,7 @@ import boto3
 
 app = Flask(__name__)
 
-aws_client = boto3.client('cognito-identity')
+#aws_client = boto3.client('cognito-identity')
 
 # Client keys are stored in .bashrc as environment variables
 client_id = os.environ['DEX_CLIENT_ID']
