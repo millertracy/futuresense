@@ -37,6 +37,7 @@ from flask import Flask, request, redirect, session, url_for, render_template
 from flask.json import jsonify
 import os
 import boto3
+from futuresense import FutureSense
 
 
 app = Flask(__name__)
@@ -103,9 +104,9 @@ def callback():
     """
     authcode = request.args.get('code', '')
     fs = FutureSense(user='djo', auth=authcode, sandbox=False)
-    fs.get_all(all_reps=4)
+    #fs.get_all(all_reps=4)
 
-    return authcode
+    return str(authcode)
     # dexcom = OAuth2Session(client_id, state=session['oauth_state'], redirect_uri=redirect, scope=scp)
     # token = dexcom.fetch_token(token_url, client_secret=client_secret,
     #                           redirect_uri=redirect_u, authorization_response=request.url)

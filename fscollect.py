@@ -8,8 +8,8 @@ with open('users.csv', 'r') as f:
 users = users.keys()
 users.remove('sandbox8')
 
-def get_data(user):
-    fs = FutureSense(user=user, sandbox=False)
+def get_data(user, auth):
+    fs = FutureSense(user=user, auth=auth, sandbox=False)
     fs.get_all(all_reps=4)
 
 
@@ -18,4 +18,4 @@ def get_data(user):
 #             for user in users]
 # futures.wait(future)
 
-get_data('djo')
+get_data(user='djo', auth='0398348e6ce192c1c981e664bfd4400c')
