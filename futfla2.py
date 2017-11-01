@@ -102,7 +102,7 @@ def callback():
     in the redirect URL. We will use that to obtain an access token.
     """
     authcode = request.args.get('code', '')
-    fs = FutureSense(user=user, auth=authcode, sandbox=False)
+    fs = FutureSense(user='djo', auth=authcode, sandbox=False)
     fs.get_all(all_reps=4)
 
     return authcode
