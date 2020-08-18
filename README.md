@@ -1,5 +1,5 @@
 # futuresense
-## Predicting Blood Glucose Levels
+## Predicting Blood Glucose Level(s)
 
 ### Business Understanding
 Can you specify a clear research question, use case or business problem?
